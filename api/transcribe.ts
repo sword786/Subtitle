@@ -1,39 +1,55 @@
-import express from "express";
 import multer from "multer";
 import { GoogleGenAI, Type } from "@google/genai";
 import fs from "fs";
 
-// Initialize express app for Vercel Serverless
-const app = express();
-
-app.use(express.json({ limit: "50mb" }));
-app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
 
 const multerFn = typeof multer === "function" ? multer : ((multer as any).default || multer);
 const upload = multerFn({ dest: "/tmp/" });
 
-// Same logic as server.ts for api/transcribe
-const getAI = () => {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY environment variable is required");
-  }
-  return new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
-    httpOptions: {
-      headers: {
-        "User-Agent": "aistudio-build",
-      },
-    },
+function runMiddleware(req: any, res: any, fn: any) {
+  return new Promise((resolve, reject) => {
+    fn(req, res, (result: any) => {
+      if (result instanceof Error) {
+        return reject(result);
+      }
+      return resolve(result);
+    });
   });
-};
+}
 
-app.post("/api/transcribe", upload.single("video"), async (req, res) => {
+export default async function handler(req: any, res: any) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  try {
+    await runMiddleware(req, res, upload.single("video"));
+  } catch (e: any) {
+    return res.status(500).json({ error: "File upload failed", details: e.message });
+  }
+
   try {
     if (!req.file) {
       return res.status(400).json({ error: "No video file provided." });
     }
 
-    const ai = getAI();
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY environment variable is required");
+    }
+
+    const ai = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
     
     const uploadResult = await ai.files.upload({
       file: req.file.path,
@@ -101,7 +117,4 @@ app.post("/api/transcribe", upload.single("video"), async (req, res) => {
     console.error("Transcription error:", error);
     res.status(500).json({ error: error.message || "An error occurred during transcription." });
   }
-});
-
-// Export the express app for Vercel
-export default app;
+}
