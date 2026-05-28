@@ -290,20 +290,66 @@ function WordRenderer({ word, isActive, isPast, config }: WordRendererProps) {
     animateProps = { scale: isActive && config.animationStyle === 'highlight' ? 1.1 : 1 };
   }
 
-  let isPill = config.displayMode === 'pill';
+  const isPill = config.displayMode === 'pill';
+  const isSolidBg = config.backgroundColor && config.backgroundColor !== '#00000000' && config.backgroundColor !== 'transparent';
   
+  let textColor = config.color || '#ffffff';
+  let backdropColor = 'transparent';
+
+  if (isPill) {
+    if (isActive) {
+      // In pill mode, the active word gets the solid background color
+      backdropColor = isSolidBg ? config.backgroundColor : '#4F46E5';
+      
+      // Determine readable text color inside active background (if background is light, use black text)
+      const bgLower = backdropColor.toLowerCase();
+      const isBgWhiteOrLight = bgLower === '#ffffff' || bgLower === '#ffff00' || bgLower === '#00ffff' || bgLower === '#39ff14';
+      textColor = isBgWhiteOrLight ? '#000000' : '#ffffff';
+    } else {
+      // Inactive word in pill mode: dark semi-transparent backdrop
+      backdropColor = 'rgba(0,0,0,0.5)';
+      textColor = config.color || '#ffffff';
+    }
+  } else {
+    // Text mode (no backdrop pill box)
+    if (isActive) {
+      // The active word gets a bright high-contrast color that stands out
+      // Either a custom chosen color (config.backgroundColor if provided, solid and NOT black/dark gray),
+      // or we auto-select a unique color distinct from the base text color (config.color)
+      const isBgBlackOrDark = config.backgroundColor && (config.backgroundColor.toLowerCase() === '#000000' || config.backgroundColor.toLowerCase() === '#1a1a1a');
+      if (isSolidBg && !isBgBlackOrDark) {
+        textColor = config.backgroundColor;
+      } else {
+        // Automatically determine a brilliant contrasting accent based on current base color
+        const baseLower = (config.color || '#ffffff').toLowerCase();
+        if (baseLower === '#ffffff' || baseLower === '#fff') {
+          textColor = '#FFFF00'; // Yellow
+        } else if (baseLower === '#ffff00') {
+          textColor = '#00FFFF'; // Cyan
+        } else if (baseLower === '#00ffff') {
+          textColor = '#FF3366'; // Pink
+        } else {
+          textColor = '#FFFF00'; // Default highlight
+        }
+      }
+    } else {
+      // Inactive text has the custom base text color
+      textColor = config.color || '#ffffff';
+    }
+  }
+
   const baseStyle: React.CSSProperties = {
     fontFamily: config.fontFamily,
     fontSize: `${config.fontSize}px`,
     fontWeight: config.fontWeight,
-    color: isPill ? (isActive ? '#fff' : config.color) : (isActive ? config.backgroundColor : config.color),
-    backgroundColor: isPill ? (isActive ? config.backgroundColor : 'rgba(0,0,0,0.5)') : 'transparent',
-    padding: isPill ? '0.1em 0.3em' : '0',
-    borderRadius: isPill ? '0.25em' : '0',
+    color: textColor,
+    backgroundColor: backdropColor,
+    padding: isPill ? '0.15em 0.4em' : '0',
+    borderRadius: isPill ? '0.35em' : '0',
     textTransform: config.uppercase ? 'uppercase' as const : 'none' as const,
-    WebkitTextStroke: (!isPill && config.shadow) ? `2px ${isActive ? '#fff' : '#000'}` : 'none',
+    WebkitTextStroke: (!isPill && config.shadow) ? `2.5px #000000` : 'none',
     filter: config.shadow ? 'drop-shadow(2px 4px 6px rgba(0,0,0,0.8))' : 'none',
-    transition: 'color 0.2s, font-size 0.2s, background-color 0.2s',
+    transition: 'color 0.15s, font-size 0.15s, background-color 0.15s, opacity 0.15s',
   };
 
   return (
@@ -312,7 +358,9 @@ function WordRenderer({ word, isActive, isPast, config }: WordRendererProps) {
       animate={animateProps}
       transition={{ type: "spring", stiffness: 300, damping: 20 }}
       style={baseStyle}
-      className={`inline-block mx-1 ${isActive ? 'z-10' : 'z-0'} ${isPast && config.animationStyle === 'highlight' ? 'opacity-80' : ''}`}
+      className={`inline-block mx-1 ${isActive ? 'z-10' : 'z-0'} ${
+        !isActive ? 'opacity-70' : 'opacity-100 font-bold'
+      } ${isPast && config.animationStyle === 'highlight' && !isPill ? 'opacity-40' : ''}`}
     >
       {word}
     </motion.span>

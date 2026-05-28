@@ -340,43 +340,45 @@ export function SidebarControls({ config, onChange, isProcessing, processingStat
             {/* Highlight (Bg) Input Control */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-xs text-white/80 font-medium">Highlight / Backdrop</label>
+                <label className="text-xs text-white/80 font-medium">
+                  {config.displayMode === 'pill' ? 'Active Pill Backdrop' : 'Active Word Highlight'}
+                </label>
                 <span className="text-[10px] font-mono text-zinc-400 uppercase bg-black/40 px-2 py-0.5 rounded border border-white/5">
-                  {config.backgroundColor === '#00000000' || config.backgroundColor === 'transparent' ? 'None' : config.backgroundColor}
+                  {config.backgroundColor === '#00000000' || config.backgroundColor === 'transparent' ? 'Dynamic' : config.backgroundColor}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2 bg-black/20 p-2.5 rounded-xl border border-white/5">
                 {[
-                  { value: '#000000', label: 'Black' },
-                  { value: '#1A1A1A', label: 'Dark Gray' },
-                  { value: '#4F46E5', label: 'Indigo' },
                   { value: '#FFFF00', label: 'Yellow' },
                   { value: '#00FFFF', label: 'Cyan' },
+                  { value: '#FF3366', label: 'Hot Pink' },
+                  { value: '#39FF14', label: 'Neon Green' },
+                  { value: '#059669', label: 'Sleek Green' },
                 ].map((preset) => {
                   const isSelected = config.backgroundColor.toUpperCase() === preset.value.toUpperCase();
                   return (
                     <button
-                      key={preset.value}
-                      type="button"
-                      onClick={() => update('backgroundColor', preset.value)}
-                      title={preset.label}
-                      className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95 flex items-center justify-center relative shadow-md ${
-                        isSelected ? 'border-indigo-400 scale-105' : 'border-white/10 hover:border-white/30'
-                      }`}
-                      style={{ backgroundColor: preset.value }}
+                       key={preset.value}
+                       type="button"
+                       onClick={() => update('backgroundColor', preset.value)}
+                       title={preset.label}
+                       className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95 flex items-center justify-center relative shadow-md ${
+                         isSelected ? 'border-indigo-400 scale-105' : 'border-white/10 hover:border-white/30'
+                       }`}
+                       style={{ backgroundColor: preset.value }}
                     >
                       {isSelected && (
-                        <span className="w-2 h-2 rounded-full bg-white shadow-sm" />
+                        <span className="w-2 h-2 rounded-full bg-black shadow-sm" />
                       )}
                     </button>
                   );
                 })}
 
-                {/* No background preset */}
+                {/* No background/highlight override button */}
                 <button
                   type="button"
                   onClick={() => update('backgroundColor', '#00000000')}
-                  title="No background"
+                  title="Dynamic contrasting color"
                   className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 active:scale-95 flex items-center justify-center relative shadow-md overflow-hidden bg-zinc-800 ${
                     config.backgroundColor === '#00000000' || config.backgroundColor === 'transparent'
                       ? 'border-indigo-400 scale-105'
@@ -384,7 +386,7 @@ export function SidebarControls({ config, onChange, isProcessing, processingStat
                   }`}
                 >
                   <div className="absolute w-full h-0.5 bg-red-500/80 rotate-45 transform" />
-                  <span className="text-[9px] font-semibold text-white/50">None</span>
+                  <span className="text-[9px] font-semibold text-white/50">Auto</span>
                 </button>
                 
                 {/* Custom Highlight Bg Color Input */}

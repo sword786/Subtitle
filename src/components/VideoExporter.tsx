@@ -242,6 +242,8 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
 
           let startXOffset = -totalWidth / 2;
 
+          const isSolidBg = config.backgroundColor && config.backgroundColor !== '#00000000' && config.backgroundColor !== 'transparent';
+
           // Render Backdrop/Pill Mode if configured
           if (config.displayMode === 'pill') {
             currentWords.forEach((wordObj, idx) => {
@@ -252,46 +254,47 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
               const padX = finalFontSize * 0.4;
               const padY = finalFontSize * 0.15;
 
-              if (isActive) {
-                ctx.fillStyle = config.backgroundColor || '#4F46E5';
-                
-                // Draw rounded rect border
-                ctx.beginPath();
-                const rx = startXOffset - padX;
-                const ry = -finalFontSize/2 - padY;
-                const rw = rectW + padX * 2;
-                const rh = finalFontSize + padY * 2;
-                const rad = finalFontSize * 0.25;
+              const activeBg = isSolidBg ? config.backgroundColor : '#4F46E5';
 
-                // Simple Canvas roundRect helper fallback
-                if (ctx.roundRect) {
-                  ctx.roundRect(rx, ry, rw, rh, rad);
-                } else {
-                  ctx.rect(rx, ry, rw, rh);
-                }
-                ctx.fill();
+              ctx.save();
+              if (isActive) {
+                ctx.fillStyle = activeBg;
               } else {
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
-                ctx.beginPath();
-                const rx = startXOffset - padX;
-                const ry = -finalFontSize/2 - padY;
-                const rw = rectW + padX * 2;
-                const rh = finalFontSize + padY * 2;
-                const rad = finalFontSize * 0.25;
-                if (ctx.roundRect) {
-                  ctx.roundRect(rx, ry, rw, rh, rad);
-                } else {
-                  ctx.rect(rx, ry, rw, rh);
-                }
-                ctx.fill();
+                ctx.globalAlpha = 0.70;
               }
 
-              // Text
+              // Draw rounded rect border
+              ctx.beginPath();
+              const rx = startXOffset - padX;
+              const ry = -finalFontSize / 2 - padY;
+              const rw = rectW + padX * 2;
+              const rh = finalFontSize + padY * 2;
+              const rad = finalFontSize * 0.25;
+
+              // Simple Canvas roundRect helper fallback
+              if (ctx.roundRect) {
+                ctx.roundRect(rx, ry, rw, rh, rad);
+              } else {
+                ctx.rect(rx, ry, rw, rh);
+              }
+              ctx.fill();
+
+              // Text styling inside the pill
               ctx.lineWidth = 0;
               ctx.shadowColor = 'transparent';
               ctx.shadowBlur = 0;
-              ctx.fillStyle = '#FFFFFF';
+
+              if (isActive) {
+                const bgLower = activeBg.toLowerCase();
+                const isBgWhiteOrLight = bgLower === '#ffffff' || bgLower === '#ffff00' || bgLower === '#00ffff' || bgLower === '#39ff14';
+                ctx.fillStyle = isBgWhiteOrLight ? '#000000' : '#FFFFFF';
+              } else {
+                ctx.fillStyle = config.color || '#FFFFFF';
+              }
+
               ctx.fillText(textWord, startXOffset + rectW / 2, 0);
+              ctx.restore();
 
               startXOffset += rectW + spaceWidth;
             });
@@ -304,6 +307,10 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
 
               ctx.save();
               
+              if (!isActive) {
+                ctx.globalAlpha = 0.70;
+              }
+
               // Apply High-End shadow and stroke properties
               if (config.shadow) {
                 ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
@@ -311,19 +318,34 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
                 ctx.shadowOffsetX = finalFontSize * 0.05;
                 ctx.shadowOffsetY = finalFontSize * 0.08;
 
-                ctx.strokeStyle = isActive ? '#FFFFFF' : '#000000';
+                ctx.strokeStyle = '#000000';
                 ctx.lineWidth = Math.max(2, finalFontSize * 0.08);
                 ctx.strokeText(textWord, startXOffset + rectW / 2, 0);
               }
 
+              let textColor = config.color || '#ffffff';
               if (isActive) {
-                ctx.fillStyle = config.backgroundColor && config.backgroundColor !== '#00000000' && config.backgroundColor !== 'transparent'
-                  ? config.backgroundColor 
-                  : '#FFFF00'; // Flashy karaoke default if no backdrop preset requested
+                const isBgBlackOrDark = config.backgroundColor && (config.backgroundColor.toLowerCase() === '#000000' || config.backgroundColor.toLowerCase() === '#1a1a1a');
+                if (isSolidBg && !isBgBlackOrDark) {
+                  textColor = config.backgroundColor;
+                } else {
+                  // Contrast highlight based on the active word
+                  const baseLower = (config.color || '#ffffff').toLowerCase();
+                  if (baseLower === '#ffffff' || baseLower === '#fff') {
+                    textColor = '#FFFF00'; // Yellow
+                  } else if (baseLower === '#ffff00') {
+                    textColor = '#00FFFF'; // Cyan
+                  } else if (baseLower === '#00ffff') {
+                    textColor = '#FF3366'; // Pink
+                  } else {
+                    textColor = '#FFFF00'; // Default highlight
+                  }
+                }
               } else {
-                ctx.fillStyle = config.color || '#FFFFFF';
+                textColor = config.color || '#FFFFFF';
               }
 
+              ctx.fillStyle = textColor;
               ctx.fillText(textWord, startXOffset + rectW / 2, 0);
               ctx.restore();
 
