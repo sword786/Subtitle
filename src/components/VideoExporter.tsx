@@ -65,7 +65,7 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
       canvas.width = width;
       canvas.height = height;
 
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      const ctx = canvas.getContext('2d');
       if (!ctx) {
         throw new Error('Canvas 2D context is not supported.');
       }
@@ -85,7 +85,7 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
         capturedStream = new MediaStream();
       }
 
-      const canvasStream = canvas.captureStream(30); // 30 FPS stream
+      const canvasStream = canvas.captureStream(60); // 60 FPS liquid-smooth stream
       const combinedStream = new MediaStream();
 
       // Add high-end canvas video track
@@ -109,8 +109,8 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
         combinedStream,
         selectedMime ? { 
           mimeType: selectedMime,
-          videoBitsPerSecond: 3000000, // 3Mbps for pristine crisp capture
-          audioBitsPerSecond: 128000   // 128kbps stable sound track
+          videoBitsPerSecond: 6000000, // 6Mbps for pristine crystal-clear 1080p capture
+          audioBitsPerSecond: 192000   // 192kbps high fidelity soundtrack
         } : undefined
       );
       recorderRef.current = recorder;
@@ -166,10 +166,18 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
       recorder.start();
 
       // 3. Render frame loop
+      let isLoopRunning = true;
+
       const renderFrame = () => {
+        if (!isLoopRunning) return;
+
         if (video.paused || video.ended) {
           if (video.ended) {
-            recorder.stop();
+            setProgress(100);
+            if (recorderRef.current && recorderRef.current.state !== 'inactive') {
+              recorderRef.current.stop();
+            }
+            isLoopRunning = false;
           }
           return;
         }
@@ -374,11 +382,16 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
           setProgress(currentProgress);
         }
 
-        renderLoopRef.current = requestAnimationFrame(renderFrame);
+        if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+          (video as any).requestVideoFrameCallback(renderFrame);
+        } else {
+          renderLoopRef.current = requestAnimationFrame(renderFrame);
+        }
       };
 
       video.onended = () => {
         setProgress(100);
+        isLoopRunning = false;
         if (renderLoopRef.current) {
           cancelAnimationFrame(renderLoopRef.current);
         }
@@ -387,8 +400,12 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
         }
       };
 
-      // Start the render loop
-      renderLoopRef.current = requestAnimationFrame(renderFrame);
+      // Start the render loop with requestVideoFrameCallback support
+      if ('requestVideoFrameCallback' in HTMLVideoElement.prototype) {
+        (video as any).requestVideoFrameCallback(renderFrame);
+      } else {
+        renderLoopRef.current = requestAnimationFrame(renderFrame);
+      }
 
     } catch (err: any) {
       console.error(err);
@@ -435,6 +452,77 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
 
         {/* Content Box */}
         <div className="p-6 flex-1 flex flex-col items-center justify-center min-h-[220px]">
+          
+          {/* Persistent Render Container - stays mounted so refs don't disconnect. Offscreen unless status === 'rendering' */}
+          <div 
+            style={
+              status === 'rendering' 
+                ? { 
+                    position: 'relative', 
+                    width: '100%', 
+                    maxWidth: '400px', 
+                    aspectRatio: '16/9', 
+                    overflow: 'hidden', 
+                    borderRadius: '16px', 
+                    border: '1px solid rgba(255,255,255,0.1)', 
+                    backgroundColor: 'black',
+                    boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.5)',
+                    marginBottom: '16px'
+                  } 
+                : { 
+                    position: 'fixed', 
+                    left: '-9999px', 
+                    top: '-9999px', 
+                    width: '320px', 
+                    height: '180px', 
+                    overflow: 'hidden', 
+                    pointerEvents: 'none', 
+                    opacity: 0.05
+                  }
+            }
+          >
+            <video
+              ref={hiddenVideoRef}
+              src={videoUrl}
+              preload="auto"
+              crossOrigin="anonymous"
+              playsInline
+              muted
+              style={{ 
+                position: 'absolute', 
+                top: '4px', 
+                left: '4px', 
+                width: '4px', 
+                height: '4px', 
+                opacity: 0.01, 
+                zIndex: 0, 
+                objectFit: 'contain' 
+              }}
+            />
+            <canvas 
+              ref={hiddenCanvasRef} 
+              style={{ 
+                position: 'absolute', 
+                inset: 0, 
+                width: '100%', 
+                height: '100%', 
+                objectFit: 'contain',
+                zIndex: 10 
+              }} 
+            />
+            {status === 'rendering' && (
+              <>
+                <div className="absolute top-2.5 left-2.5 bg-zinc-950/85 backdrop-blur-md text-[10px] text-indigo-400 font-bold px-2.5 py-1 rounded-xl border border-white/5 shadow-md flex items-center gap-1.5 z-25 font-sans tracking-wide">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                  BAKING OVERLAYS ({progress}%)
+                </div>
+                <div className="absolute bottom-2.5 right-2.5 bg-zinc-950/85 backdrop-blur-md text-[9px] text-white/50 px-2 py-1 rounded-lg border border-white/5 shadow-md z-25 font-mono">
+                  {hiddenVideoRef.current ? `${hiddenVideoRef.current.currentTime.toFixed(1)}s` : ''}
+                </div>
+              </>
+            )}
+          </div>
+
           {status === 'idle' && (
             <div className="text-center space-y-4 py-4">
               <div className="w-16 h-16 rounded-full bg-zinc-800/80 flex items-center justify-center mx-auto text-3xl">
@@ -456,39 +544,16 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
           )}
 
           {status === 'rendering' && (
-            <div className="w-full text-center space-y-5 py-4">
-              <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
-                {/* Circular path spinner */}
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
-                  <path
-                    className="text-zinc-800"
-                    strokeWidth="3"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                  <path
-                    className="text-indigo-500 transition-all duration-300"
-                    strokeDasharray={`${progress}, 100`}
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    stroke="currentColor"
-                    fill="none"
-                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                  />
-                </svg>
-                <span className="absolute text-sm font-black font-mono text-white">{progress}%</span>
-              </div>
-              
-              <div>
-                <h3 className="text-sm font-semibold text-white animate-pulse">Baking styled subtitles into video frames...</h3>
-                <p className="text-xs text-zinc-400 mt-1">Please keep this window open and wait. Playing at 1x speed to secure stable frame rate.</p>
-              </div>
+            <div className="w-full text-center space-y-3 py-2">
+              <h3 className="text-sm font-bold text-white animate-pulse">Rendering Video Frame-by-Frame...</h3>
+              <p className="text-xs text-zinc-400 mt-1 max-w-sm mx-auto leading-relaxed">
+                Encoding liquid-smooth 60 FPS video at master quality. Keep this tab active to preserve encoding thread priority.
+              </p>
             </div>
           )}
 
           {status === 'completed' && (
-            <div className="text-center space-y-4 py-4">
+            <div className="w-full text-center space-y-4 py-2">
               <div className="w-14 h-14 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto">
                 <CheckCircle2 className="w-10 h-10" />
               </div>
@@ -496,10 +561,26 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
                 <h3 className="text-md font-bold text-white">Rendering Completed!</h3>
                 <p className="text-xs text-zinc-400 mt-1">Your high-resolution captioned video has been compiled successfully.</p>
               </div>
+
+              {/* Video Preview Frame */}
+              {downloadUrl && (
+                <div className="w-full max-w-sm mx-auto overflow-hidden rounded-2xl border border-white/10 bg-black/40 aspect-video shadow-2xl relative group/preview mt-3">
+                  <video 
+                    src={downloadUrl} 
+                    controls 
+                    className="w-full h-full object-contain"
+                    playsInline
+                  />
+                  <div className="absolute top-2 left-2 bg-zinc-950/80 backdrop-blur-md text-[10px] text-emerald-400 px-2 py-0.5 rounded-md font-mono border border-emerald-500/20 shadow-md">
+                    LIVE PREVIEW
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-3 justify-center pt-2">
                 <button
                   onClick={handleDownload}
-                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 font-semibold text-white text-xs px-5 py-2.5 rounded-xl transition-transform active:scale-95 shadow-md"
+                  className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 font-semibold text-white text-xs px-5 py-2.5 rounded-xl transition-transform active:scale-95 shadow-md shadow-indigo-600/20"
                 >
                   <Download className="w-4 h-4" /> Save Video File
                 </button>
@@ -538,20 +619,6 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
               </div>
             </div>
           )}
-        </div>
-
-        {/* Offscreen Elements required for background execution (never use display:none or .hidden, as browsers throttle frame decoding there) */}
-        <div style={{ position: 'fixed', left: '-9999px', top: '-9999px', width: '320px', height: '180px', overflow: 'hidden', pointerEvents: 'none', opacity: 0.01 }}>
-          <video
-            ref={hiddenVideoRef}
-            src={videoUrl}
-            preload="auto"
-            crossOrigin="anonymous"
-            playsInline
-            muted
-            style={{ width: '100%', height: '100%' }}
-          />
-          <canvas ref={hiddenCanvasRef} />
         </div>
       </div>
     </div>

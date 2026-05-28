@@ -240,10 +240,42 @@ export function SidebarControls({ config, onChange, isProcessing, processingStat
             </div>
 
             <div>
-              <label className="text-sm text-white/80 block mb-2 flex justify-between">
-                <span>Font Size</span>
-                <span className="text-blue-400">{config.fontSize}px</span>
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-white/85">Font Size</span>
+                <div className="flex items-center gap-1.5 bg-black/50 border border-white/5 rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => update('fontSize', Math.max(16, config.fontSize - 2))}
+                    className="w-6 h-6 flex items-center justify-center rounded-md bg-white/5 hover:bg-white/10 active:scale-95 text-white/80 hover:text-white font-bold text-xs transition-transform"
+                    title="Decrease Size (-2px)"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    min="16"
+                    max="120"
+                    value={config.fontSize}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value);
+                      if (!isNaN(val)) {
+                        update('fontSize', Math.min(120, Math.max(16, val)));
+                      }
+                    }}
+                    className="w-10 bg-transparent text-center text-xs font-bold text-blue-400 focus:outline-none [-moz-appearance:_textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    title="Type precise font size"
+                  />
+                  <span className="text-[10px] text-zinc-500 font-medium -ml-1 pr-1">px</span>
+                  <button
+                    type="button"
+                    onClick={() => update('fontSize', Math.min(120, config.fontSize + 2))}
+                    className="w-6 h-6 flex items-center justify-center rounded-md bg-white/5 hover:bg-white/10 active:scale-95 text-white/80 hover:text-white font-bold text-xs transition-transform"
+                    title="Increase Size (+2px)"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
               <input
                 type="range"
                 min="16"

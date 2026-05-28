@@ -227,8 +227,82 @@ export function VideoPlayer({ videoUrl, transcript, config, onChange, onTimeUpda
               window.addEventListener('pointerup', handlePointerUp);
             }}
           >
-            <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-black/85 backdrop-blur-md rounded-md px-2 py-0.5 text-[9px] text-white/60 opacity-0 group-hover/caption:opacity-100 group-active/caption:opacity-100 pointer-events-none transition-opacity whitespace-nowrap border border-white/5 font-mono shadow-md">
-              Drag to position ({config.positionX}%, {config.positionY}%)
+            <div className="absolute -top-9 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-zinc-950/95 backdrop-blur-md rounded-xl px-2.5 py-1 text-[10px] text-white opacity-0 group-hover/caption:opacity-100 group-active/caption:opacity-100 transition-opacity whitespace-nowrap border border-white/10 shadow-lg z-30 select-none">
+              <span className="text-white/60 font-mono text-[9px]">Size: <strong className="text-blue-400">{config.fontSize}px</strong></span>
+              <div className="flex items-center gap-1 border-l border-white/10 pl-2">
+                <button
+                  type="button"
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onChange({ ...config, fontSize: Math.max(16, config.fontSize - 2) });
+                  }}
+                  className="w-5 h-5 flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-90 rounded font-bold text-[10px] transition-all text-center text-white"
+                  title="Decrease Size"
+                >
+                  -
+                </button>
+                <button
+                  type="button"
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onChange({ ...config, fontSize: Math.min(120, config.fontSize + 2) });
+                  }}
+                  className="w-5 h-5 flex items-center justify-center bg-white/10 hover:bg-white/20 active:scale-90 rounded font-bold text-[10px] transition-all text-center text-white"
+                  title="Increase Size"
+                >
+                  +
+                </button>
+              </div>
+              <span className="text-white/30 text-[9px] border-l border-white/10 pl-2 pointer-events-none">Drag to position ({config.positionX}%, {config.positionY}%)</span>
+            </div>
+
+            {/* Visual Resize / Scale Drag Handle on bottom-right corner */}
+            <div
+              className="absolute bottom-[-6px] right-[-6px] w-5.5 h-5.5 rounded-full bg-indigo-600 hover:bg-indigo-500 active:scale-90 border-2 border-zinc-900 flex items-center justify-center opacity-0 group-hover/caption:opacity-100 transition-opacity cursor-se-resize shadow-lg z-30 select-none hover:scale-110"
+              title="Drag outwards or inwards to dynamically change text size"
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startFontSize = config.fontSize;
+                const el = e.currentTarget;
+                try {
+                  el.setPointerCapture(e.pointerId);
+                } catch (err) {}
+
+                const handlePointerMove = (moveEvent: PointerEvent) => {
+                  const deltaX = moveEvent.clientX - startX;
+                  const deltaY = moveEvent.clientY - startY;
+                  // Dragging down and right increases font size, up and left decreases
+                  const delta = (deltaX + deltaY) * 0.45;
+                  const newSize = Math.round(startFontSize + delta);
+                  onChange({
+                    ...config,
+                    fontSize: Math.min(120, Math.max(16, newSize))
+                  });
+                };
+
+                const handlePointerUp = (upEvent: PointerEvent) => {
+                  try {
+                    el.releasePointerCapture(upEvent.pointerId);
+                  } catch (err) {}
+                  window.removeEventListener('pointermove', handlePointerMove);
+                  window.removeEventListener('pointerup', handlePointerUp);
+                };
+
+                window.addEventListener('pointermove', handlePointerMove);
+                window.addEventListener('pointerup', handlePointerUp);
+              }}
+            >
+              {/* Simple elegant diagonal arrows resize icon */}
+              <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-white">
+                <polyline points="15 3 21 3 21 9" />
+                <polyline points="9 21 3 21 3 15" />
+                <line x1="21" y1="3" x2="3" y2="21" />
+              </svg>
             </div>
             
             <AnimatePresence mode="popLayout">
