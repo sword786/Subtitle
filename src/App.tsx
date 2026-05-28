@@ -60,7 +60,24 @@ export default function App() {
       const formData = new FormData();
       formData.append('video', videoFile);
 
-      const response = await fetch('/api/transcribe', {
+      // Detect if we are running in an Android Capacitor app, Desktop Electron, or a plain file:// protocol context
+      // in which case the backend express server isn't running on the same local origin.
+      const isPackaged = typeof (window as any).Capacitor !== 'undefined' || 
+                         navigator.userAgent.toLowerCase().includes('electron') ||
+                         window.location.protocol === 'file:' || 
+                         window.location.hostname === 'localhost'; 
+      // Note: for "localhost" preview in AI Studio, the actual hostname is not localhost, it's a random string like "ais-dev-x...". 
+      // Wait, let's just stick to absolute URL if it's explicitly mobile or local testing, or better yet, inject the preview URL.
+      
+      // Safe fallback logic
+      const PRODUCTION_API = 'https://ais-pre-niaxytdciqzqhemoqa7deh-6307712061.asia-southeast1.run.app';
+      
+      let fetchUrl = '/api/transcribe';
+      if (typeof (window as any).Capacitor !== 'undefined' || navigator.userAgent.toLowerCase().includes('electron') || window.location.protocol === 'file:') {
+        fetchUrl = `${PRODUCTION_API}/api/transcribe`;
+      }
+
+      const response = await fetch(fetchUrl, {
         method: 'POST',
         body: formData,
       });
@@ -82,7 +99,13 @@ export default function App() {
         throw new Error(errMsg);
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
+        throw new Error("Server returned an invalid response (expected JSON, but got HTML or text instead). Please ensure your API is properly deployed and reachable.");
+      }
+      
       setTranscript(data.words);
       setActiveTab('editor'); // Automatically switch to Editor tab on mobile for instant editing!
     } catch (error: any) {

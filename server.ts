@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import multer from "multer";
+import cors from "cors";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import fs from "fs";
@@ -8,6 +9,7 @@ import fs from "fs";
 const app = express();
 const PORT = 3000;
 
+app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
@@ -29,13 +31,21 @@ const getAI = () => {
   });
 };
 
-app.post("/api/transcribe", upload.single("video"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No video file provided." });
+app.post("/api/transcribe", (req, res) => {
+  console.log("Received POST request to /api/transcribe");
+  upload.single("video")(req, res, async (err) => {
+    if (err) {
+      console.error("Multer error:", err);
+      return res.status(400).json({ error: err.message || "File upload error." });
     }
+    try {
+      console.log("File parsed:", req.file ? req.file.path : "No file");
+      if (!req.file) {
+        return res.status(400).json({ error: "No video file provided." });
+      }
 
-    const ai = getAI();
+      const ai = getAI();
+
     
     // We will read the file manually and pass it as inlineData.
     // If the file is too large for inlineData it might fail. Gemini supports inlineData up to certain size limit.
@@ -112,7 +122,9 @@ app.post("/api/transcribe", upload.single("video"), async (req, res) => {
     console.error("Transcription error:", error);
     res.status(500).json({ error: error.message || "An error occurred during transcription." });
   }
+  });
 });
+
 
 // Vite middleware for development
 async function startServer() {
@@ -129,6 +141,12 @@ async function startServer() {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
+
+  // Global error handler for API routes
+  app.use("/api", (err: any, req: any, res: any, next: any) => {
+    console.error("API Error:", err);
+    res.status(500).json({ error: err.message || "Internal server error" });
+  });
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
