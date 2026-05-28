@@ -15,13 +15,11 @@
   ],
   "asar": true,
   "win": {
-    "target": ["nsis", "portable"],
-    "icon": "public/manifest.json"
+    "target": ["nsis", "portable"]
   },
   "mac": {
     "target": ["dmg", "zip"],
-    "category": "public.app-category.video",
-    "icon": "public/manifest.json"
+    "category": "public.app-category.video"
   },
   "linux": {
     "target": ["AppImage", "deb"],
