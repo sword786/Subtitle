@@ -10,6 +10,7 @@ import { SidebarControls } from './components/SidebarControls';
 import { SubtitleManager } from './components/SubtitleManager';
 import { VideoExporter } from './components/VideoExporter';
 import { ComputerInstaller } from './components/ComputerInstaller';
+import { extractAudioToWav } from './utils/audioExtractor';
 import { CaptionConfig, TimestampedWord } from './types';
 import { Sparkles, Laptop } from 'lucide-react';
 
@@ -17,6 +18,7 @@ export default function App() {
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState<string>('');
   const [transcript, setTranscript] = useState<TimestampedWord[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
   const [seekToTime, setSeekToTime] = useState<number | null>(null);
@@ -55,28 +57,42 @@ export default function App() {
   const handleTranscribe = async () => {
     if (!videoFile) return;
     setIsProcessing(true);
+    setProcessingStatus('Initializing extraction...');
     
     try {
-      const formData = new FormData();
-      formData.append('video', videoFile);
-
-      // Detect if we are running in an Android Capacitor app, Desktop Electron, or a plain file:// protocol context
-      // in which case the backend express server isn't running on the same local origin.
-      const isPackaged = typeof (window as any).Capacitor !== 'undefined' || 
-                         navigator.userAgent.toLowerCase().includes('electron') ||
-                         window.location.protocol === 'file:' || 
-                         window.location.hostname === 'localhost'; 
-      // Note: for "localhost" preview in AI Studio, the actual hostname is not localhost, it's a random string like "ais-dev-x...". 
-      // Wait, let's just stick to absolute URL if it's explicitly mobile or local testing, or better yet, inject the preview URL.
+      let audioBlob: Blob;
+      let uploadFileName = 'audio.wav';
       
-      // Safe fallback logic
+      try {
+        setProcessingStatus('Extracting Audio track...');
+        audioBlob = await extractAudioToWav(videoFile, (msg) => {
+          setProcessingStatus(msg);
+        });
+      } catch (audioErr) {
+        console.warn('Browser offline audio extraction failed, using original video file instead', audioErr);
+        audioBlob = videoFile;
+        uploadFileName = videoFile.name;
+      }
+
+      setProcessingStatus('Uploading audio to AI Server...');
+      const formData = new FormData();
+      formData.append('video', audioBlob, uploadFileName);
+
+      // Detect if we are running outside the proper Cloud Run server environment (e.g. on Vercel)
+      // Vercel serverless has severe 4.5MB request payload and 10 second execution timeout limits,
+      // while Cloud Run supports unlimited files and direct processing.
+      const isSandboxRuntime = window.location.hostname.endsWith('.run.app') || 
+                               window.location.hostname === 'localhost' ||
+                               window.location.hostname === '127.0.0.1';
+      
       const PRODUCTION_API = 'https://ais-pre-niaxytdciqzqhemoqa7deh-6307712061.asia-southeast1.run.app';
       
       let fetchUrl = '/api/transcribe';
-      if (typeof (window as any).Capacitor !== 'undefined' || navigator.userAgent.toLowerCase().includes('electron') || window.location.protocol === 'file:') {
+      if (!isSandboxRuntime || typeof (window as any).Capacitor !== 'undefined' || navigator.userAgent.toLowerCase().includes('electron') || window.location.protocol === 'file:') {
         fetchUrl = `${PRODUCTION_API}/api/transcribe`;
       }
 
+      setProcessingStatus('Transcribing speech via Gemini...');
       const response = await fetch(fetchUrl, {
         method: 'POST',
         body: formData,
@@ -99,6 +115,7 @@ export default function App() {
         throw new Error(errMsg);
       }
 
+      setProcessingStatus('Decoding subtitles...');
       let data;
       try {
         data = await response.json();
@@ -113,6 +130,7 @@ export default function App() {
       alert('Error generating captions: ' + error.message);
     } finally {
       setIsProcessing(false);
+      setProcessingStatus('');
     }
   };
 
@@ -176,6 +194,7 @@ export default function App() {
                   config={config} 
                   onChange={setConfig} 
                   isProcessing={isProcessing}
+                  processingStatus={processingStatus}
                   onTranscribe={handleTranscribe}
                   hasTranscript={transcript.length > 0}
                   transcript={transcript}
@@ -238,7 +257,15 @@ export default function App() {
                           disabled={isProcessing}
                           className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white py-3 px-4 rounded-xl font-semibold transition-all disabled:opacity-50 inline-flex items-center justify-center gap-2"
                         >
-                          {isProcessing ? 'Generating Transcripts...' : 'Generate AI Subtitles'}
+                          {isProcessing ? (
+                            <>
+                              <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              <span>{processingStatus || 'Generating...'}</span>
+                            </>
+                          ) : 'Generate AI Subtitles'}
                         </button>
                       </div>
                     )}
@@ -251,6 +278,7 @@ export default function App() {
                       config={config} 
                       onChange={setConfig} 
                       isProcessing={isProcessing}
+                      processingStatus={processingStatus}
                       onTranscribe={handleTranscribe}
                       hasTranscript={transcript.length > 0}
                       transcript={transcript}
