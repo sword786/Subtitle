@@ -11,7 +11,8 @@ const PORT = 3000;
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
-const upload = multer({ dest: "/tmp/" });
+const multerFn = typeof multer === "function" ? multer : ((multer as any).default || multer);
+const upload = multerFn({ dest: "/tmp/" });
 
 // Initialize GenAI
 const getAI = () => {

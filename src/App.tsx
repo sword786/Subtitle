@@ -66,8 +66,20 @@ export default function App() {
       });
 
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.error || 'Transcription failed');
+        let errMsg = 'Transcription failed';
+        try {
+          const err = await response.json();
+          errMsg = err.error || errMsg;
+        } catch (_) {
+          try {
+            const txt = await response.text();
+            // Fallback to error status or a short snippet of the HTML response
+            errMsg = txt.slice(0, 150).trim() || `API error (${response.status})`;
+          } catch (__) {
+            errMsg = `API error with status ${response.status}`;
+          }
+        }
+        throw new Error(errMsg);
       }
 
       const data = await response.json();
