@@ -17,6 +17,11 @@ export function VideoPlayer({ videoUrl, transcript, config, onChange, onTimeUpda
   const containerRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [analyzedUrl, setAnalyzedUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setAnalyzedUrl(null);
+  }, [videoUrl]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -143,6 +148,28 @@ export function VideoPlayer({ videoUrl, transcript, config, onChange, onTimeUpda
           className="w-full h-full object-contain"
           onClick={togglePlay}
           onEnded={() => setIsPlaying(false)}
+          onLoadedMetadata={(e) => {
+            const video = e.currentTarget;
+            const w = video.videoWidth;
+            const h = video.videoHeight;
+            if (!w || !h || analyzedUrl === videoUrl) return;
+            
+            setAnalyzedUrl(videoUrl);
+            const isVertical = w < h;
+            
+            // Auto analyze video dimension to pick the best caption placement "sweet spot"
+            // For standard horizontal content, 36px font & 80% vertical position is best.
+            // For vertical shorts, 46px font & 70% vertical position is highly optimal.
+            const calculatedFontSize = isVertical ? 46 : 36;
+            const calculatedPosY = isVertical ? 70 : 80;
+            
+            onChange({
+              ...config,
+              fontSize: calculatedFontSize,
+              positionY: calculatedPosY,
+              positionX: 50,
+            });
+          }}
         />
         
         {/* Caption Overlay */}
@@ -301,10 +328,16 @@ function WordRenderer({ word, isActive, isPast, config }: WordRendererProps) {
       // In pill mode, the active word gets the solid background color
       backdropColor = isSolidBg ? config.backgroundColor : '#4F46E5';
       
-      // Determine readable text color inside active background (if background is light, use black text)
-      const bgLower = backdropColor.toLowerCase();
-      const isBgWhiteOrLight = bgLower === '#ffffff' || bgLower === '#ffff00' || bgLower === '#00ffff' || bgLower === '#39ff14';
-      textColor = isBgWhiteOrLight ? '#000000' : '#ffffff';
+      const configColorLower = (config.color || '#ffffff').toLowerCase();
+      // If text color configuration is default or plain white/black, we automatically choose the most readable contrast color
+      if (configColorLower === '#ffffff' || configColorLower === '#fff' || configColorLower === '#000000' || configColorLower === '#000') {
+        const bgLower = backdropColor.toLowerCase();
+        const isBgWhiteOrLight = bgLower === '#ffffff' || bgLower === '#ffff00' || bgLower === '#00ffff' || bgLower === '#39ff14';
+        textColor = isBgWhiteOrLight ? '#000000' : '#ffffff';
+      } else {
+        // Otherwise, prioritize the user's custom chosen text color
+        textColor = config.color;
+      }
     } else {
       // Inactive word in pill mode: dark semi-transparent backdrop
       backdropColor = 'rgba(0,0,0,0.5)';

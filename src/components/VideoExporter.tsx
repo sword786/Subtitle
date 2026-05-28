@@ -104,9 +104,14 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
         }
       }
 
+      // Setup recorder with high quality parameters to prevent compression stuttering and visual lagging
       const recorder = new MediaRecorder(
         combinedStream,
-        selectedMime ? { mimeType: selectedMime } : undefined
+        selectedMime ? { 
+          mimeType: selectedMime,
+          videoBitsPerSecond: 3000000, // 3Mbps for pristine crisp capture
+          audioBitsPerSecond: 128000   // 128kbps stable sound track
+        } : undefined
       );
       recorderRef.current = recorder;
 
@@ -286,9 +291,16 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
               ctx.shadowBlur = 0;
 
               if (isActive) {
-                const bgLower = activeBg.toLowerCase();
-                const isBgWhiteOrLight = bgLower === '#ffffff' || bgLower === '#ffff00' || bgLower === '#00ffff' || bgLower === '#39ff14';
-                ctx.fillStyle = isBgWhiteOrLight ? '#000000' : '#FFFFFF';
+                const configColorLower = (config.color || '#ffffff').toLowerCase();
+                // If text color configuration is default or plain white/black, we automatically choose the most readable contrast color
+                if (configColorLower === '#ffffff' || configColorLower === '#fff' || configColorLower === '#000000' || configColorLower === '#000') {
+                  const bgLower = activeBg.toLowerCase();
+                  const isBgWhiteOrLight = bgLower === '#ffffff' || bgLower === '#ffff00' || bgLower === '#00ffff' || bgLower === '#39ff14';
+                  ctx.fillStyle = isBgWhiteOrLight ? '#000000' : '#FFFFFF';
+                } else {
+                  // Otherwise, prioritize the user's custom chosen text color
+                  ctx.fillStyle = config.color;
+                }
               } else {
                 ctx.fillStyle = config.color || '#FFFFFF';
               }
@@ -528,13 +540,16 @@ export function VideoExporter({ videoUrl, transcript, config, isOpen, onClose }:
           )}
         </div>
 
-        {/* Hidden Elements required for background execution */}
-        <div className="hidden">
+        {/* Offscreen Elements required for background execution (never use display:none or .hidden, as browsers throttle frame decoding there) */}
+        <div style={{ position: 'fixed', left: '-9999px', top: '-9999px', width: '320px', height: '180px', overflow: 'hidden', pointerEvents: 'none', opacity: 0.01 }}>
           <video
             ref={hiddenVideoRef}
             src={videoUrl}
             preload="auto"
             crossOrigin="anonymous"
+            playsInline
+            muted
+            style={{ width: '100%', height: '100%' }}
           />
           <canvas ref={hiddenCanvasRef} />
         </div>
