@@ -1,0 +1,6 @@
+{
+  "name": "Captify AI",
+  "description": "An AI-powered auto caption generator. Upload any video and automatically generate perfectly synced, highly customizable word-by-word captions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
