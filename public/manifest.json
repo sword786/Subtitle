@@ -7,6 +7,7 @@
   "theme_color": "#4F46E5",
   "display": "standalone",
   "orientation": "any",
+  "categories": ["video", "utilities", "productivity", "social"],
   "icons": [
     {
       "src": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&q=80&w=192&h=192",
