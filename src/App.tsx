@@ -78,17 +78,17 @@ export default function App() {
       const formData = new FormData();
       formData.append('video', audioBlob, uploadFileName);
 
-      // Detect if we are running outside the proper Cloud Run server environment (e.g. on Vercel)
-      // Vercel serverless has severe 4.5MB request payload and 10 second execution timeout limits,
-      // while Cloud Run supports unlimited files and direct processing.
-      const isSandboxRuntime = window.location.hostname.endsWith('.run.app') || 
-                               window.location.hostname === 'localhost' ||
-                               window.location.hostname === '127.0.0.1';
+      // Resolve endpoint URL
+      // If we are in Capacitor (mobile), Electron (desktop), or file:// protocol, we fall back to the absolute PRODUCTION_API.
+      // Otherwise, we leverage the relative '/api/transcribe' path (ideal for localhost, Vercel, and Cloud Run deployments).
+      const isShellRuntime = typeof (window as any).Capacitor !== 'undefined' || 
+                             navigator.userAgent.toLowerCase().includes('electron') || 
+                             window.location.protocol === 'file:';
       
       const PRODUCTION_API = 'https://ais-pre-niaxytdciqzqhemoqa7deh-6307712061.asia-southeast1.run.app';
       
       let fetchUrl = '/api/transcribe';
-      if (!isSandboxRuntime || typeof (window as any).Capacitor !== 'undefined' || navigator.userAgent.toLowerCase().includes('electron') || window.location.protocol === 'file:') {
+      if (isShellRuntime) {
         fetchUrl = `${PRODUCTION_API}/api/transcribe`;
       }
 
